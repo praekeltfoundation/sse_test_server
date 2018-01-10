@@ -3,7 +3,8 @@ defmodule SSETestServer.SSEHandler do
   alias SSETestServer.SSEServer
 
   defmodule State do
-    defstruct stream_handler: nil, delay: nil
+    @enforce_keys [:path, :sse_server]
+    defstruct path: nil, sse_server: nil, delay: nil
   end
 
   # TODO: Find a way to get rid of the chunk wrappers around all this stuff to
@@ -12,7 +13,7 @@ defmodule SSETestServer.SSEHandler do
   def init(req, state) do
     # state.delay is nil (which is falsey) or an integer (which is truthy).
     if state.delay, do: Process.sleep(state.delay)
-    SSEServer.sse_stream(state.stream_handler, self())
+    SSEServer.sse_stream(state.sse_server, state.path, self())
     new_req = :cowboy_req.stream_reply(
       200, %{"content-type" => "text/event-stream"}, req)
     {:cowboy_loop, new_req, state}
