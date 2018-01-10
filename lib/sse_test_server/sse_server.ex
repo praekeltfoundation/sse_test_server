@@ -5,46 +5,8 @@ defmodule SSETestServer.SSEServer do
   TODO: Document properly.
   """
   use GenServer
-  alias __MODULE__
 
-  defmodule HandlerState do
-    defstruct stream_handler: nil, delay: nil
-  end
-
-  # TODO: Find a way to get rid of the chunk wrappers around all this stuff to
-  # allow testing clients that don't handle transport-encodings transparently.
-
-  defmodule SSEHandler do
-    def init(req, state) do
-      # state.delay is nil (which is falsey) or an integer (which is truthy).
-      if state.delay, do: Process.sleep(state.delay)
-      SSEServer.sse_stream(state.stream_handler, self())
-      new_req = :cowboy_req.stream_reply(
-        200, %{"content-type" => "text/event-stream"}, req)
-      {:cowboy_loop, new_req, state}
-    end
-
-    def info(:keepalive, req, state) do
-      :cowboy_req.stream_body("\r\n", :nofin, req)
-      {:ok, req, state}
-    end
-
-    def info({:event, event, data}, req, state) do
-      ev = "event: #{event}\r\ndata: #{data}\r\n\r\n"
-      :cowboy_req.stream_body(ev, :nofin, req)
-      {:ok, req, state}
-    end
-
-    def info(:close, req, state) do
-      {:stop, req, state}
-    end
-
-    ## Client API
-
-    def keepalive(handler), do: send(handler, :keepalive)
-    def event(handler, {:event, _, _}=event), do: send(handler, event)
-    def close(handler), do: send(handler, :close)
-  end
+  alias SSETestServer.SSEHandler
 
   defmodule State do
     defstruct listener: nil, port: nil, sse_streams: []
@@ -67,7 +29,7 @@ defmodule SSETestServer.SSEServer do
   def init(args) do
     # Trap exits so terminate/2 gets called reliably.
     Process.flag(:trap_exit, true)
-    handler_state = %HandlerState{
+    handler_state = %SSEHandler.State{
       stream_handler: self(),
       delay: Keyword.get(args, :response_delay),
     }
