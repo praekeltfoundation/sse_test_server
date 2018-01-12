@@ -3,28 +3,7 @@ defmodule SSETestServerTest.SSEServerTest do
 
   alias SSETestServer.SSEServer
 
-  @stream_headers [{"content-type", "text/event-stream"}]
-
-  def assert_response(resp=%HTTPoison.Response{}, body, status_code, headers) do
-    assert %HTTPoison.Response{status_code: ^status_code, body: ^body} = resp
-    for h <- headers, do: assert h in resp.headers
-  end
-
-  def assert_response(task=%Task{}, body, status_code, headers) do
-    {:ok, resp} = Task.await(task)
-    assert_response(resp, body, status_code, headers)
-  end
-
-  def assert_response(resp, body, status_code),
-    do: assert_response(resp, body, status_code, @stream_headers)
-
-  def event_data({ev, data}), do: "event: #{ev}\r\ndata: #{data}\r\n\r\n"
-  def event_data(:keepalive), do: "\r\n"
-
-  def assert_events(resp, events) do
-    body = events |> Stream.map(&event_data/1) |> Enum.join
-    assert_response(resp, body, 200)
-  end
+  import SSEAssertions
 
   def connect_and_collect(path),
     do: SSEClient.connect_and_collect("#{SSEServer.base_url()}#{path}")
