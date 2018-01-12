@@ -30,14 +30,19 @@ defmodule SSETestServer.SSEServer do
 
   ## Client API
 
-  def start_link(args, opts \\ [name: :sse_test_server]) do
-    GenServer.start_link(__MODULE__, args, opts)
-  end
+  def start_link(args, opts \\ [name: :sse_test_server]),
+    do: GenServer.start_link(__MODULE__, args, opts)
+
   def port(sse \\ :sse_test_server), do: GenServer.call(sse, :port)
   def base_url(sse \\ :sse_test_server), do: "http://localhost:#{port(sse)}"
 
-  def add_endpoint(sse \\ :sse_test_server, path, handler_opts \\ []),
+  # We can't default both `sse` and `handler_opts`, so the latter is required
+  # if the former is provided.
+  def add_endpoint(sse, path, handler_opts),
     do: GenServer.call(sse, {:add_endpoint, path, handler_opts})
+
+  def add_endpoint(path, handler_opts \\ []),
+    do: add_endpoint(:sse_test_server, path, handler_opts)
 
   def event(sse \\ :sse_test_server, path, event, data),
     do: GenServer.call(sse, {:event, path, event, data})
@@ -95,7 +100,6 @@ defmodule SSETestServer.SSEServer do
     new_endpoint = %{endpoint | streams: [pid | endpoint.streams]}
     new_endpoints = Map.put(state.sse_endpoints, path, new_endpoint)
     new_state = %{state | sse_endpoints: new_endpoints}
-    # IO.inspect {:sse_stream, new_state}
     {:reply, :ok, new_state}
   end
 
@@ -123,7 +127,6 @@ defmodule SSETestServer.SSEServer do
   end
 
   def handle_call({:end_stream, path}, _from, state) do
-    # IO.inspect {:end_stream, state}
     case Map.fetch(state.sse_endpoints, path) do
       :error -> {:reply, :path_not_found, state}
       {:ok, %{streams: streams}} ->

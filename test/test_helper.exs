@@ -42,7 +42,6 @@ defmodule SSEClient do
   end
 
   defp collect_async(caller, resp) do
-    # IO.inspect {:ca, caller, resp}
     receive do
       # Getting the status indicates we're connected and can return the task.
       %HTTPoison.AsyncStatus{code: code} ->

@@ -87,4 +87,14 @@ defmodule SSETestServerTest.SSEServerTest do
     :path_not_found = SSEServer.keepalive("/nothing")
     :path_not_found = SSEServer.end_stream("/events")
   end
+
+  test "can reference the SSEServer by pid" do
+    {:ok, pid} = SSEServer.start_link([port: 4040], name: nil)
+    :ok = SSEServer.add_endpoint(pid, "/events", [])
+    task = SSEClient.connect_and_collect("#{SSEServer.base_url(pid)}/events")
+    :ok = SSEServer.keepalive(pid, "/events")
+    :ok = SSEServer.event(pid, "/events", "myevent", "mydata")
+    :ok = SSEServer.end_stream(pid, "/events")
+    assert_events(task, [:keepalive, {"myevent", "mydata"}])
+  end
 end
