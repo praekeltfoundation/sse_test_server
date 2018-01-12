@@ -9,13 +9,13 @@ defmodule SSETestServerTest.SSEServerTest do
     do: SSEClient.connect_and_collect("#{SSEServer.base_url()}#{path}")
 
   test "request fails for unconfigured endpoint" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     task = connect_and_collect("/nothing")
     assert_response(task, "", 404, [])
   end
 
   test "can request a stream without events or keepalives" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
     :ok = SSEServer.end_stream("/events")
@@ -23,7 +23,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can request a stream with one keepalive" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
     :ok = SSEServer.keepalive("/events")
@@ -32,7 +32,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can request a stream with one event" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
     :ok = SSEServer.event("/events", "myevent", "mydata")
@@ -41,7 +41,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can request a stream with two events" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
     :ok = SSEServer.event("/events", "myevent", "mydata")
@@ -51,7 +51,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can request a stream with events and keepalives" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
     :ok = SSEServer.keepalive("/events")
@@ -70,7 +70,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can request a stream with multiple concurrent clients" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task1 = connect_and_collect("/events")
     :ok = SSEServer.event("/events", "myevent", "mydata")
@@ -82,7 +82,7 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "operations on missing endpoints fail gracefully" do
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :path_not_found = SSEServer.event("/nothing", "myevent", "mydata")
     :path_not_found = SSEServer.keepalive("/nothing")
     :path_not_found = SSEServer.end_stream("/events")
@@ -94,7 +94,7 @@ defmodule SSETestServerTest.SSEServerTest do
     # incorrect results and waiting too long.
     delay_ms = 250
 
-    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/delayed_events", response_delay: delay_ms)
     :ok = SSEServer.add_endpoint("/events")
 
@@ -116,8 +116,6 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can reference the SSEServer by pid" do
-    # We're not starting our SSEServer for this test under a supervisor, so use
-    # a random port to avoid cowboy listener races between tests.
     {:ok, pid} = SSEServer.start_link([port: 0], name: nil)
     :ok = SSEServer.add_endpoint(pid, "/events", [])
     task = SSEClient.connect_and_collect("#{SSEServer.base_url(pid)}/events")
