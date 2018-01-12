@@ -8,6 +8,7 @@ defmodule SSETestServer.Mixfile do
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
       deps: deps(),
+      aliases: aliases(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
         "coveralls": :test,
@@ -24,6 +25,11 @@ defmodule SSETestServer.Mixfile do
       mod: {SSETestServer.Application, []}
     ]
   end
+
+  defp aliases, do: [
+    # Don't start application for tests.
+    test: "test --no-start",
+  ]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do

@@ -18,28 +18,40 @@ defmodule SSETestServer.SSEServer do
 
     def new(path, handler_opts \\ []) do
       handler_state = %SSEHandler.State{path: path, sse_server: self()}
-      %__MODULE__{path: path, handler_state: Map.merge(handler_state, Map.new(handler_opts))}
+      %__MODULE__{
+        path: path,
+        handler_state: Map.merge(handler_state, Map.new(handler_opts)),
+      }
     end
 
     def to_handler(endpoint),
       do: {endpoint.path, SSEHandler, endpoint.handler_state}
   end
 
-  ## Client
+  ## Client API
 
-  def start_link(args, opts \\ []) do
+  def start_link(args, opts \\ [name: :sse_test_server]) do
     GenServer.start_link(__MODULE__, args, opts)
   end
-  def port(sse), do: GenServer.call(sse, :port)
-  def base_url(sse), do: "http://localhost:#{port(sse)}"
+  def port(sse \\ :sse_test_server), do: GenServer.call(sse, :port)
+  def base_url(sse \\ :sse_test_server), do: "http://localhost:#{port(sse)}"
 
-  def add_endpoint(sse, path, handler_opts \\ []),
+  def add_endpoint(sse \\ :sse_test_server, path, handler_opts \\ []),
     do: GenServer.call(sse, {:add_endpoint, path, handler_opts})
-  def event(sse, path, event, data), do: GenServer.call(sse, {:event, path, event, data})
-  def keepalive(sse, path), do: GenServer.call(sse, {:keepalive, path})
-  def end_stream(sse, path), do: GenServer.call(sse, {:end_stream, path})
 
-  def sse_stream(sse, path, pid), do: GenServer.call(sse, {:sse_stream, path, pid})
+  def event(sse \\ :sse_test_server, path, event, data),
+    do: GenServer.call(sse, {:event, path, event, data})
+
+  def keepalive(sse \\ :sse_test_server, path),
+    do: GenServer.call(sse, {:keepalive, path})
+
+  def end_stream(sse \\ :sse_test_server, path),
+    do: GenServer.call(sse, {:end_stream, path})
+
+  ## Internal client API
+
+  def sse_stream(sse, path, pid),
+    do: GenServer.call(sse, {:sse_stream, path, pid})
 
   ## Callbacks
 

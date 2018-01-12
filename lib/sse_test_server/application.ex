@@ -5,11 +5,12 @@ defmodule SSETestServer.Application do
 
   use Application
 
+  defp get_config(key), do: Application.fetch_env!(:sse_test_server, key)
+
   def start(_type, _args) do
-    # List all child processes to be supervised
+    args = [port: get_config(:port)]
     children = [
-      # Starts a worker by calling: SSETestServer.Worker.start_link(arg)
-      # {SSETestServer.Worker, arg},
+      {SSETestServer.SSEServer, args}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

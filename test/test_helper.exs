@@ -49,4 +49,11 @@ defmodule SSEClient do
 
 end
 
+# We don't start applications during tests because we don't want our own app
+# running, but we do need all its dependencies running.
+Application.load(:sse_test_server)
+for app <- Application.spec(:sse_test_server, :applications) do
+  Application.ensure_all_started(app)
+end
+
 ExUnit.start()

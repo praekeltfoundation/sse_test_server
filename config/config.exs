@@ -28,3 +28,9 @@ use Mix.Config
 # here (which is why it is important to import them last).
 #
 #     import_config "#{Mix.env}.exs"
+
+# These are the minimal required defaults. Full configuration defined in
+# sse_test_server.schema.exs and sse_test_server.*.conf.
+config :sse_test_server, [
+  port: 4040,
+]
