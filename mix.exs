@@ -7,7 +7,13 @@ defmodule SSETestServer.Mixfile do
       version: "0.1.0",
       elixir: "~> 1.5",
       start_permanent: Mix.env == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        "coveralls": :test,
+        "coveralls.json": :test,
+        "coveralls.html": :test,
+      ],
     ]
   end
 
@@ -30,6 +36,7 @@ defmodule SSETestServer.Mixfile do
       # we'll use an earlier version.
       {:hackney, "~> 1.9.0", only: :test},
       {:httpoison, "~> 0.13", only: :test},
+      {:excoveralls, "~> 0.7", only: :test},
     ]
   end
 end
