@@ -116,7 +116,9 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "can reference the SSEServer by pid" do
-    {:ok, pid} = SSEServer.start_link([port: 4040], name: nil)
+    # We're not starting our SSEServer for this test under a supervisor, so use
+    # a random port to avoid cowboy listener races between tests.
+    {:ok, pid} = SSEServer.start_link([port: 0], name: nil)
     :ok = SSEServer.add_endpoint(pid, "/events", [])
     task = SSEClient.connect_and_collect("#{SSEServer.base_url(pid)}/events")
     :ok = SSEServer.keepalive(pid, "/events")
