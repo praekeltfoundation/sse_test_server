@@ -4,15 +4,15 @@ defmodule SSETestServer.SSEHandler do
 
   defmodule State do
     @enforce_keys [:path, :sse_server]
-    defstruct path: nil, sse_server: nil, delay: nil
+    defstruct path: nil, sse_server: nil, response_delay: nil
   end
 
   # TODO: Find a way to get rid of the chunk wrappers around all this stuff to
   # allow testing clients that don't handle transport-encodings transparently.
 
   def init(req, state) do
-    # state.delay is nil (which is falsey) or an integer (which is truthy).
-    if state.delay, do: Process.sleep(state.delay)
+    # state.response_delay is nil (which is falsey) or an integer (which is truthy).
+    if state.response_delay, do: Process.sleep(state.response_delay)
     SSEServer.sse_stream(state.sse_server, state.path, self())
     new_req = :cowboy_req.stream_reply(
       200, %{"content-type" => "text/event-stream"}, req)

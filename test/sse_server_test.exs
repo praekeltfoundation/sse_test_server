@@ -88,6 +88,33 @@ defmodule SSETestServerTest.SSEServerTest do
     :path_not_found = SSEServer.end_stream("/events")
   end
 
+  test "configurable response delay" do
+    # On my machine, without waiting for the response, the delay is
+    # consistently under 100ms. I chose 250ms here as a balance between
+    # incorrect results and waiting too long.
+    delay_ms = 250
+
+    {:ok, _} = start_supervised {SSEServer, [port: 4040]}
+    :ok = SSEServer.add_endpoint("/delayed_events", response_delay: delay_ms)
+    :ok = SSEServer.add_endpoint("/events")
+
+    # Delayed endpoint.
+    de0 = Time.utc_now()
+    detask = connect_and_collect("/delayed_events")
+    de1 = Time.utc_now()
+    :ok = SSEServer.end_stream("/delayed_events")
+    assert_response(detask, "", 200)
+    assert Time.diff(de1, de0, :milliseconds) >= delay_ms
+
+    # Non-delayed endpoint as a control.
+    e0 = Time.utc_now()
+    etask = connect_and_collect("/events")
+    e1 = Time.utc_now()
+    :ok = SSEServer.end_stream("/events")
+    assert_response(etask, "", 200)
+    assert Time.diff(e1, e0, :milliseconds) < delay_ms
+  end
+
   test "can reference the SSEServer by pid" do
     {:ok, pid} = SSEServer.start_link([port: 4040], name: nil)
     :ok = SSEServer.add_endpoint(pid, "/events", [])
