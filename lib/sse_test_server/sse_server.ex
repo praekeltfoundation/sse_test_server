@@ -2,7 +2,15 @@ defmodule SSETestServer.SSEServer do
   @moduledoc """
   An HTTP server for testing SSE clients.
 
-  TODO: Document properly.
+  `SSETestServer.SSEServer` manages configurable Server-Sent Event endpoints,
+  where each endpoint has its own HTTP path.
+
+  Endpoints are created and configured by calling `add_endpoint/2` (or
+  `add_endpoint/3`). Once an endpoint exists, events and keepalives can be sent
+  with `event/4` and `keepalive/2`. All connections to an endpoint can be
+  closed with `end_stream/2`.
+
+  TODO: Allow endpoints to be created and managed over HTTP.
   """
   use GenServer
 
