@@ -1,4 +1,5 @@
 defmodule SSETestServer.SSEHandler do
+  @behaviour :cowboy_loop
 
   alias SSETestServer.SSEServer
 

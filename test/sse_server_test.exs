@@ -89,9 +89,9 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "configurable response delay" do
-    # On my machine, without waiting for the response, the delay is
-    # consistently under 100ms. I chose 250ms here as a balance between
-    # incorrect results and waiting too long.
+    # On my machine, the response time with no configured delay is consistently
+    # under 100ms. I chose 250ms here as a balance between incorrect results
+    # and waiting too long.
     delay_ms = 250
 
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
