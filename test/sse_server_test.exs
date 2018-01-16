@@ -5,8 +5,9 @@ defmodule SSETestServerTest.SSEServerTest do
 
   import SSEAssertions
 
-  def connect_and_collect(path),
-    do: SSEClient.connect_and_collect("#{SSEServer.base_url()}#{path}")
+  def url(path), do: "#{SSEServer.base_url()}#{path}"
+
+  def connect_and_collect(path), do: SSEClient.connect_and_collect(url(path))
 
   test "unconfigured endpoints 404" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
@@ -136,4 +137,55 @@ defmodule SSETestServerTest.SSEServerTest do
     :ok = SSEServer.end_stream(pid, "/events")
     assert_events(task, [:keepalive, {"myevent", "mydata"}])
   end
+
+  @tag :http
+  test "missing HTTP action" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    {:error, resp} = ControlClient.post(url("/events"), [])
+    %{status_code: 400, body: "Missing field: action"} = resp
+  end
+
+  @tag :http
+  test "bad HTTP action" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    {:error, resp} = ControlClient.post(
+      "#{SSEServer.base_url()}/events", action: "brew_coffee")
+    %{status_code: 400, body: "Unknown action: brew_coffee"} = resp
+  end
+
+  @tag :http
+  test "stream events and keepalives over HTTP" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    task = connect_and_collect("/events")
+    :ok = ControlClient.keepalive(url("/events"))
+    :ok = ControlClient.event(url("/events"), "myevent", "mydata")
+    :ok = ControlClient.keepalive(url("/events"))
+    :ok = ControlClient.keepalive(url("/events"))
+    :ok = ControlClient.event(url("/events"), "yourevent", "yourdata")
+    :ok = ControlClient.end_stream(url("/events"))
+    assert_events(task, [
+          :keepalive,
+          {"myevent", "mydata"},
+          :keepalive,
+          :keepalive,
+          {"yourevent", "yourdata"},
+        ])
+  end
+
+  @tag :http
+  test "stream raw bytes over HTTP" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    task = connect_and_collect("/events")
+    :ok = ControlClient.stream_bytes(url("/events"), "some ")
+    :ok = ControlClient.stream_bytes(url("/events"), "bytes")
+    :ok = ControlClient.keepalive(url("/events"))
+    :ok = ControlClient.stream_bytes(url("/events"), "bye")
+    :ok = ControlClient.end_stream(url("/events"))
+    assert_response(task, "some bytes\r\nbye", 200)
+  end
+
 end

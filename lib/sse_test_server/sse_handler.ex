@@ -11,6 +11,41 @@ defmodule SSETestServer.SSEHandler do
   # TODO: Find a way to get rid of the chunk wrappers around all this stuff to
   # allow testing clients that don't handle transport-encodings transparently.
 
+  # POST a stream action.
+  def init(req=%{method: "POST"}, state) do
+    {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
+    fields = Map.new(field_list)
+    req_resp =
+      case Map.get(fields, "action") do
+        "stream_bytes" ->
+          SSEServer.stream_bytes(
+            state.sse_server, state.path, Map.get(fields, "bytes"))
+          :cowboy_req.reply(204, req_read)
+
+        "keepalive" ->
+          SSEServer.keepalive(state.sse_server, state.path)
+          :cowboy_req.reply(204, req_read)
+
+        "event" ->
+          SSEServer.event(
+            state.sse_server, state.path, Map.get(fields, "event"),
+            Map.get(fields, "data"))
+          :cowboy_req.reply(204, req_read)
+
+        "end_stream" ->
+          SSEServer.end_stream(state.sse_server, state.path)
+          :cowboy_req.reply(204, req_read)
+
+        nil ->
+          :cowboy_req.reply(400, %{}, "Missing field: action", req_read)
+
+        action ->
+          :cowboy_req.reply(400, %{}, "Unknown action: #{action}", req_read)
+      end
+    {:ok, req_resp, state}
+  end
+
+  # GET an event-stream.
   def init(req, state) do
     # state.response_delay is nil (which is falsey) or an integer (which is truthy).
     if state.response_delay, do: Process.sleep(state.response_delay)
