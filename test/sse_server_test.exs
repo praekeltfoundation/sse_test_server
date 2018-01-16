@@ -8,13 +8,13 @@ defmodule SSETestServerTest.SSEServerTest do
   def connect_and_collect(path),
     do: SSEClient.connect_and_collect("#{SSEServer.base_url()}#{path}")
 
-  test "request fails for unconfigured endpoint" do
+  test "unconfigured endpoints 404" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     task = connect_and_collect("/nothing")
     assert_response(task, "", 404, [])
   end
 
-  test "can request a stream without events or keepalives" do
+  test "stream no data" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
@@ -22,7 +22,7 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "", 200)
   end
 
-  test "can request a stream with one keepalive" do
+  test "stream one keepalive" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
@@ -31,7 +31,7 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "\r\n", 200)
   end
 
-  test "can request a stream with one event" do
+  test "stream one event" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
@@ -40,7 +40,7 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "event: myevent\r\ndata: mydata\r\n\r\n", 200)
   end
 
-  test "can request a stream with two events" do
+  test "stream two events" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
@@ -50,7 +50,7 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_events(task, [{"myevent", "mydata"}, {"yourevent", "yourdata"}])
   end
 
-  test "can request a stream with events and keepalives" do
+  test "stream events and keepalives" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
@@ -69,7 +69,19 @@ defmodule SSETestServerTest.SSEServerTest do
         ])
   end
 
-  test "can request a stream with multiple concurrent clients" do
+  test "stream raw data" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    task = connect_and_collect("/events")
+    :ok = SSEServer.raw("/events", "some ")
+    :ok = SSEServer.raw("/events", "bytes")
+    :ok = SSEServer.keepalive("/events")
+    :ok = SSEServer.raw("/events", "bye")
+    :ok = SSEServer.end_stream("/events")
+    assert_response(task, "some bytes\r\nbye", 200)
+  end
+
+  test "stream to multiple concurrent clients" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task1 = connect_and_collect("/events")
@@ -115,7 +127,7 @@ defmodule SSETestServerTest.SSEServerTest do
     assert Time.diff(e1, e0, :milliseconds) < delay_ms
   end
 
-  test "can reference the SSEServer by pid" do
+  test "reference SSEServer by pid" do
     {:ok, pid} = SSEServer.start_link([port: 0], name: nil)
     :ok = SSEServer.add_endpoint(pid, "/events", [])
     task = SSEClient.connect_and_collect("#{SSEServer.base_url(pid)}/events")

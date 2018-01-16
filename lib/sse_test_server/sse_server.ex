@@ -58,6 +58,9 @@ defmodule SSETestServer.SSEServer do
   def keepalive(sse \\ :sse_test_server, path),
     do: GenServer.call(sse, {:keepalive, path})
 
+  def raw(sse \\ :sse_test_server, path, bytes),
+    do: GenServer.call(sse, {:raw, path, bytes})
+
   def end_stream(sse \\ :sse_test_server, path),
     do: GenServer.call(sse, {:end_stream, path})
 
@@ -116,29 +119,23 @@ defmodule SSETestServer.SSEServer do
     {:reply, :ok, set_endpoint(state, new_endpoint)}
   end
 
-  def handle_call({:event, path, event, data}, _from, state) do
-    case Map.fetch(state.sse_endpoints, path) do
-      :error -> {:reply, :path_not_found, state}
-      {:ok, %{streams: streams}} ->
-        Enum.each(streams, &SSEHandler.event(&1, {:event, event, data}))
-        {:reply, :ok, state}
-    end
-  end
+  def handle_call({:event, path, event, data}, _from, state),
+    do: send_to_handler({:event, event, data}, path, state)
 
-  def handle_call({:keepalive, path}, _from, state) do
-    case Map.fetch(state.sse_endpoints, path) do
-      :error -> {:reply, :path_not_found, state}
-      {:ok, %{streams: streams}} ->
-        Enum.each(streams, &SSEHandler.keepalive/1)
-        {:reply, :ok, state}
-    end
-  end
+  def handle_call({:keepalive, path}, _from, state),
+    do: send_to_handler(:keepalive, path, state)
 
-  def handle_call({:end_stream, path}, _from, state) do
+  def handle_call({:raw, path, bytes}, _from, state),
+    do: send_to_handler({:raw, bytes}, path, state)
+
+  def handle_call({:end_stream, path}, _from, state),
+    do: send_to_handler(:close, path, state)
+
+  defp send_to_handler(thing, path, state) do
     case Map.fetch(state.sse_endpoints, path) do
       :error -> {:reply, :path_not_found, state}
       {:ok, %{streams: streams}} ->
-        Enum.each(streams, &SSEHandler.close/1)
+        Enum.each(streams, &SSEHandler.send_info(&1, thing))
         {:reply, :ok, state}
     end
   end

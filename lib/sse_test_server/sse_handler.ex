@@ -20,6 +20,11 @@ defmodule SSETestServer.SSEHandler do
     {:cowboy_loop, new_req, state}
   end
 
+  def info({:raw, bytes}, req, state) do
+    :cowboy_req.stream_body(bytes, :nofin, req)
+    {:ok, req, state}
+  end
+
   def info(:keepalive, req, state) do
     :cowboy_req.stream_body("\r\n", :nofin, req)
     {:ok, req, state}
@@ -37,7 +42,5 @@ defmodule SSETestServer.SSEHandler do
 
   ## Client API
 
-  def keepalive(handler), do: send(handler, :keepalive)
-  def event(handler, {:event, _, _}=event), do: send(handler, event)
-  def close(handler), do: send(handler, :close)
+  def send_info(handler, thing), do: send(handler, thing)
 end
