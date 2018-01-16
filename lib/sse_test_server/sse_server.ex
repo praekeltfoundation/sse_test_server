@@ -58,8 +58,8 @@ defmodule SSETestServer.SSEServer do
   def keepalive(sse \\ :sse_test_server, path),
     do: GenServer.call(sse, {:keepalive, path})
 
-  def raw(sse \\ :sse_test_server, path, bytes),
-    do: GenServer.call(sse, {:raw, path, bytes})
+  def stream_bytes(sse \\ :sse_test_server, path, bytes),
+    do: GenServer.call(sse, {:stream_bytes, path, bytes})
 
   def end_stream(sse \\ :sse_test_server, path),
     do: GenServer.call(sse, {:end_stream, path})
@@ -119,17 +119,19 @@ defmodule SSETestServer.SSEServer do
     {:reply, :ok, set_endpoint(state, new_endpoint)}
   end
 
+  def handle_call({:stream_bytes, path, bytes}, _from, state),
+    do: send_to_handler({:stream_bytes, bytes}, path, state)
+
   def handle_call({:event, path, event, data}, _from, state),
-    do: send_to_handler({:event, event, data}, path, state)
+    do: send_to_handler({:stream_bytes, mkevent(event, data)}, path, state)
 
   def handle_call({:keepalive, path}, _from, state),
-    do: send_to_handler(:keepalive, path, state)
-
-  def handle_call({:raw, path, bytes}, _from, state),
-    do: send_to_handler({:raw, bytes}, path, state)
+    do: send_to_handler({:stream_bytes, "\r\n"}, path, state)
 
   def handle_call({:end_stream, path}, _from, state),
     do: send_to_handler(:close, path, state)
+
+  defp mkevent(event, data), do: "event: #{event}\r\ndata: #{data}\r\n\r\n"
 
   defp send_to_handler(thing, path, state) do
     case Map.fetch(state.sse_endpoints, path) do

@@ -69,14 +69,14 @@ defmodule SSETestServerTest.SSEServerTest do
         ])
   end
 
-  test "stream raw data" do
+  test "stream raw bytes" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
     task = connect_and_collect("/events")
-    :ok = SSEServer.raw("/events", "some ")
-    :ok = SSEServer.raw("/events", "bytes")
+    :ok = SSEServer.stream_bytes("/events", "some ")
+    :ok = SSEServer.stream_bytes("/events", "bytes")
     :ok = SSEServer.keepalive("/events")
-    :ok = SSEServer.raw("/events", "bye")
+    :ok = SSEServer.stream_bytes("/events", "bye")
     :ok = SSEServer.end_stream("/events")
     assert_response(task, "some bytes\r\nbye", 200)
   end

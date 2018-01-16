@@ -20,19 +20,8 @@ defmodule SSETestServer.SSEHandler do
     {:cowboy_loop, new_req, state}
   end
 
-  def info({:raw, bytes}, req, state) do
+  def info({:stream_bytes, bytes}, req, state) do
     :cowboy_req.stream_body(bytes, :nofin, req)
-    {:ok, req, state}
-  end
-
-  def info(:keepalive, req, state) do
-    :cowboy_req.stream_body("\r\n", :nofin, req)
-    {:ok, req, state}
-  end
-
-  def info({:event, event, data}, req, state) do
-    ev = "event: #{event}\r\ndata: #{data}\r\n\r\n"
-    :cowboy_req.stream_body(ev, :nofin, req)
     {:ok, req, state}
   end
 
