@@ -12,6 +12,18 @@ defmodule SSETestServer.SSEHandler do
   # TODO: Find a way to get rid of the chunk wrappers around all this stuff to
   # allow testing clients that don't handle transport-encodings transparently.
 
+  ## Callbacks
+
+  # GET an event-stream.
+  def init(req=%{method: "GET"}, state) do
+    # state.response_delay is nil (falsey) or an integer (truthy).
+    if state.response_delay, do: Process.sleep(state.response_delay)
+    SSEServer.sse_stream(state.sse_server, state.path, self())
+    new_req = :cowboy_req.stream_reply(
+      200, %{"content-type" => "text/event-stream"}, req)
+    {:cowboy_loop, new_req, state}
+  end
+
   # POST a stream action.
   def init(req=%{method: "POST"}, state) do
     {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
@@ -19,16 +31,6 @@ defmodule SSETestServer.SSEHandler do
       "action", Map.new(field_list), req_read,
       &perform_action(&1, &2, req_read, state))
     {:ok, req_resp, state}
-  end
-
-  # GET an event-stream.
-  def init(req, state) do
-    # state.response_delay is nil (which is falsey) or an integer (which is truthy).
-    if state.response_delay, do: Process.sleep(state.response_delay)
-    SSEServer.sse_stream(state.sse_server, state.path, self())
-    new_req = :cowboy_req.stream_reply(
-      200, %{"content-type" => "text/event-stream"}, req)
-    {:cowboy_loop, new_req, state}
   end
 
   def info({:stream_bytes, bytes}, req, state) do
@@ -56,13 +58,10 @@ defmodule SSETestServer.SSEHandler do
   end
 
   def perform_action("event", fields, req, state) do
-    HU.process_field("event", fields, req,
-      fn event, _ ->
-        HU.process_field("data", fields, req,
-          fn data, _ ->
-            SSEServer.event(state.sse_server, state.path, event, data)
-            HU.success(req)
-          end)
+    HU.process_fields(["event", "data"], fields, req,
+      fn [event, data], _ ->
+        SSEServer.event(state.sse_server, state.path, event, data)
+        HU.success(req)
       end)
   end
 

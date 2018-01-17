@@ -9,6 +9,9 @@ defmodule SSETestServerTest.SSEServerTest do
 
   def connect_and_collect(path), do: SSEClient.connect_and_collect(url(path))
 
+  def assert_control_err(body, code, {:error, resp}),
+    do: assert_response(resp, body, code, [])
+
   test "unconfigured endpoints 404" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     task = connect_and_collect("/nothing")
@@ -176,6 +179,18 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   @tag :http
+  test "HTTP event with missing fields" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    assert_control_err("Missing field: data", 400,
+      ControlClient.post(url("/events"), action: "event", event: "myevent"))
+    assert_control_err("Missing field: event", 400,
+      ControlClient.post(url("/events"), action: "event", data: "mydata"))
+    assert_control_err("Missing field: event", 400,
+      ControlClient.post(url("/events"), action: "event"))
+  end
+
+  @tag :http
   test "stream raw bytes over HTTP" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
@@ -192,8 +207,8 @@ defmodule SSETestServerTest.SSEServerTest do
   test "HTTP stream_bytes with missing field" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
-    assert {:error, %{body: "Missing field: bytes"}} =
-      ControlClient.post(url("/events"), action: "stream_bytes")
+    assert_control_err("Missing field: bytes", 400,
+      ControlClient.post(url("/events"), action: "stream_bytes"))
   end
 
 end

@@ -14,4 +14,17 @@ defmodule SSETestServer.HandlerUtils do
     end
   end
 
+  def process_fields(field_names, fields, req, fun),
+    do: process_fields(field_names, [], fields, req, fun)
+
+  defp process_fields([], values, fields, _req, fun),
+    do: fun.(Enum.reverse(values), fields)
+
+  defp process_fields([field | field_names], values, fields, req, fun) do
+    process_field(field, fields, req,
+      fn value, new_fields ->
+        process_fields(field_names, [value | values], new_fields, req, fun)
+      end)
+  end
+
 end
