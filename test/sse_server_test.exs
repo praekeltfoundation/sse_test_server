@@ -188,4 +188,12 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "some bytes\r\nbye", 200)
   end
 
+  @tag :http
+  test "HTTP stream_bytes with missing field" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    assert {:error, %{body: "Missing field: bytes"}} =
+      ControlClient.post(url("/events"), action: "stream_bytes")
+  end
+
 end

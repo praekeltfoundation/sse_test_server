@@ -1,6 +1,7 @@
 defmodule SSETestServer.SSEHandler do
   @behaviour :cowboy_loop
 
+  alias SSETestServer.HandlerUtils, as: HU
   alias SSETestServer.SSEServer
 
   defmodule State do
@@ -14,34 +15,9 @@ defmodule SSETestServer.SSEHandler do
   # POST a stream action.
   def init(req=%{method: "POST"}, state) do
     {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
-    fields = Map.new(field_list)
-    req_resp =
-      case Map.get(fields, "action") do
-        "stream_bytes" ->
-          SSEServer.stream_bytes(
-            state.sse_server, state.path, Map.get(fields, "bytes"))
-          :cowboy_req.reply(204, req_read)
-
-        "keepalive" ->
-          SSEServer.keepalive(state.sse_server, state.path)
-          :cowboy_req.reply(204, req_read)
-
-        "event" ->
-          SSEServer.event(
-            state.sse_server, state.path, Map.get(fields, "event"),
-            Map.get(fields, "data"))
-          :cowboy_req.reply(204, req_read)
-
-        "end_stream" ->
-          SSEServer.end_stream(state.sse_server, state.path)
-          :cowboy_req.reply(204, req_read)
-
-        nil ->
-          :cowboy_req.reply(400, %{}, "Missing field: action", req_read)
-
-        action ->
-          :cowboy_req.reply(400, %{}, "Unknown action: #{action}", req_read)
-      end
+    req_resp = HU.process_field(
+      "action", Map.new(field_list), req_read,
+      &perform_action(&1, &2, req_read, state))
     {:ok, req_resp, state}
   end
 
@@ -62,6 +38,41 @@ defmodule SSETestServer.SSEHandler do
 
   def info(:close, req, state) do
     {:stop, req, state}
+  end
+
+  ## Internals
+
+  def perform_action("stream_bytes", fields, req, state) do
+    HU.process_field("bytes", fields, req,
+      fn bytes, _ ->
+        SSEServer.stream_bytes(state.sse_server, state.path, bytes)
+        HU.success(req)
+      end)
+  end
+
+  def perform_action("keepalive", _fields, req, state) do
+    SSEServer.keepalive(state.sse_server, state.path)
+    HU.success(req)
+  end
+
+  def perform_action("event", fields, req, state) do
+    HU.process_field("event", fields, req,
+      fn event, _ ->
+        HU.process_field("data", fields, req,
+          fn data, _ ->
+            SSEServer.event(state.sse_server, state.path, event, data)
+            HU.success(req)
+          end)
+      end)
+  end
+
+  def perform_action("end_stream", _fields, req, state) do
+    SSEServer.end_stream(state.sse_server, state.path)
+    HU.success(req)
+  end
+
+  def perform_action(action, _fields, req, _state) do
+    HU.bad_request(req, "Unknown action: #{action}")
   end
 
   ## Client API
