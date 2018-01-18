@@ -44,7 +44,7 @@ defmodule SSETestServer.SSEHandler do
 
   ## Internals
 
-  def perform_action("stream_bytes", fields, req, state) do
+  defp perform_action("stream_bytes", fields, req, state) do
     HU.process_field("bytes", fields, req,
       fn bytes, _ ->
         SSEServer.stream_bytes(state.sse_server, state.path, bytes)
@@ -52,12 +52,12 @@ defmodule SSETestServer.SSEHandler do
       end)
   end
 
-  def perform_action("keepalive", _fields, req, state) do
+  defp perform_action("keepalive", _fields, req, state) do
     SSEServer.keepalive(state.sse_server, state.path)
     HU.success(req)
   end
 
-  def perform_action("event", fields, req, state) do
+  defp perform_action("event", fields, req, state) do
     HU.process_fields(["event", "data"], fields, req,
       fn [event, data], _ ->
         SSEServer.event(state.sse_server, state.path, event, data)
@@ -65,12 +65,12 @@ defmodule SSETestServer.SSEHandler do
       end)
   end
 
-  def perform_action("end_stream", _fields, req, state) do
+  defp perform_action("end_stream", _fields, req, state) do
     SSEServer.end_stream(state.sse_server, state.path)
     HU.success(req)
   end
 
-  def perform_action(action, _fields, req, _state) do
+  defp perform_action(action, _fields, req, _state) do
     HU.bad_request(req, "Unknown action: #{action}")
   end
 

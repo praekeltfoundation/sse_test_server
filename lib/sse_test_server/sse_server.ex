@@ -10,11 +10,11 @@ defmodule SSETestServer.SSEServer do
   with `event/4` and `keepalive/2`. All connections to an endpoint can be
   closed with `end_stream/2`.
 
-  TODO: Allow endpoints to be created and managed over HTTP.
+  TODO: Document HTTP API.
   """
   use GenServer
 
-  alias SSETestServer.SSEHandler
+  alias SSETestServer.{AddHandler, SSEHandler}
 
   defmodule State do
     defstruct listener: nil, port: nil, sse_endpoints: %{}
@@ -76,7 +76,7 @@ defmodule SSETestServer.SSEServer do
     Process.flag(:trap_exit, true)
     listener_ref = make_ref()
     ranch_args = args |> Enum.filter(fn {k, _} -> k in [:port] end)
-    dispatch = :cowboy_router.compile([{:_, []}])
+    dispatch = :cowboy_router.compile([{:_, handlers_for_endpoints()}])
     {:ok, listener} = :cowboy.start_clear(
       listener_ref, ranch_args, %{env: %{dispatch: dispatch}})
     Process.link(listener)
@@ -88,12 +88,17 @@ defmodule SSETestServer.SSEServer do
     update_env(%State{state | sse_endpoints: new_endpoints})
   end
 
-  defp update_env(state) do
-    handlers =
-      state.sse_endpoints
+  defp handlers_for_endpoints(sse_endpoints \\ %{}) do
+    sse_handlers =
+      sse_endpoints
       |> Map.values
       |> Enum.map(&SSEEndpoint.to_handler/1)
       |> Enum.sort
+    sse_handlers ++ [{:_, AddHandler, %AddHandler.State{sse_server: self()}}]
+  end
+
+  defp update_env(state) do
+    handlers = handlers_for_endpoints(state.sse_endpoints)
     dispatch = :cowboy_router.compile([{:_, handlers}])
     :cowboy.set_env(state.listener, :dispatch, dispatch)
     state

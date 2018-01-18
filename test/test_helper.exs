@@ -85,6 +85,9 @@ defmodule ControlClient do
     end
   end
 
+  def add_endpoint(url, handler_opts \\ []),
+    do: post(url, [{:action, "add_endpoint"} | handler_opts])
+
   def stream_bytes(url, bytes),
     do: post(url, action: "stream_bytes", bytes: bytes)
 

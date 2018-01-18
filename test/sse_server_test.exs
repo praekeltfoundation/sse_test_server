@@ -141,27 +141,73 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_events(task, [:keepalive, {"myevent", "mydata"}])
   end
 
-  @tag :http
+  @tag :http_api
+  test "create endpoint over HTTP" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = ControlClient.add_endpoint(url("/events"))
+    task = connect_and_collect("/events")
+    :ok = ControlClient.end_stream(url("/events"))
+    assert_response(task, "", 200)
+  end
+
+  @tag :http_api
+  test "create endpoint with response delay over HTTP" do
+    # On my machine, the response time with no configured delay is consistently
+    # under 100ms. I chose 250ms here as a balance between incorrect results
+    # and waiting too long.
+    delay_ms = 250
+
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = ControlClient.add_endpoint(
+      url("/delayed_events"), response_delay: delay_ms)
+    :ok = ControlClient.add_endpoint(url("/events"))
+
+    # Delayed endpoint.
+    de0 = Time.utc_now()
+    detask = connect_and_collect("/delayed_events")
+    de1 = Time.utc_now()
+    :ok = ControlClient.end_stream(url("/delayed_events"))
+    assert_response(detask, "", 200)
+    assert Time.diff(de1, de0, :milliseconds) >= delay_ms
+
+    # Non-delayed endpoint as a control.
+    e0 = Time.utc_now()
+    etask = connect_and_collect("/events")
+    e1 = Time.utc_now()
+    :ok = ControlClient.end_stream(url("/events"))
+    assert_response(etask, "", 200)
+    assert Time.diff(e1, e0, :milliseconds) < delay_ms
+  end
+
+  @tag :http_api
   test "missing HTTP action" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     {:error, resp} = ControlClient.post(url("/events"), [])
     %{status_code: 400, body: "Missing field: action"} = resp
   end
 
-  @tag :http
+  @tag :http_api
   test "bad HTTP action" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     {:error, resp} = ControlClient.post(
       "#{SSEServer.base_url()}/events", action: "brew_coffee")
     %{status_code: 400, body: "Unknown action: brew_coffee"} = resp
   end
 
-  @tag :http
+  @tag :http_api
+  test "stream action on missing endpoint" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    {:error, resp} = ControlClient.post(
+      "#{SSEServer.base_url()}/nothing", action: "keepalive")
+    %{status_code: 400, body: "Unknown action: keepalive"} = resp
+  end
+
+  @tag :http_api
   test "stream events and keepalives over HTTP" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     task = connect_and_collect("/events")
     :ok = ControlClient.keepalive(url("/events"))
     :ok = ControlClient.event(url("/events"), "myevent", "mydata")
@@ -178,10 +224,10 @@ defmodule SSETestServerTest.SSEServerTest do
         ])
   end
 
-  @tag :http
+  @tag :http_api
   test "HTTP event with missing fields" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     assert_control_err("Missing field: data", 400,
       ControlClient.post(url("/events"), action: "event", event: "myevent"))
     assert_control_err("Missing field: event", 400,
@@ -190,10 +236,10 @@ defmodule SSETestServerTest.SSEServerTest do
       ControlClient.post(url("/events"), action: "event"))
   end
 
-  @tag :http
+  @tag :http_api
   test "stream raw bytes over HTTP" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     task = connect_and_collect("/events")
     :ok = ControlClient.stream_bytes(url("/events"), "some ")
     :ok = ControlClient.stream_bytes(url("/events"), "bytes")
@@ -203,10 +249,10 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "some bytes\r\nbye", 200)
   end
 
-  @tag :http
+  @tag :http_api
   test "HTTP stream_bytes with missing field" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = ControlClient.add_endpoint(url("/events"))
     assert_control_err("Missing field: bytes", 400,
       ControlClient.post(url("/events"), action: "stream_bytes"))
   end
