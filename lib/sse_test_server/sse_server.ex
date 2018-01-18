@@ -89,12 +89,19 @@ defmodule SSETestServer.SSEServer do
   end
 
   defp handlers_for_endpoints(sse_endpoints \\ %{}) do
-    sse_handlers =
-      sse_endpoints
-      |> Map.values
-      |> Enum.map(&SSEEndpoint.to_handler/1)
-      |> Enum.sort
-    sse_handlers ++ [{:_, AddHandler, %AddHandler.State{sse_server: self()}}]
+    # Although the list of endpoints is almost certainly small enough to render
+    # this optimisation moot, I used it because I think it's a neat way to
+    # append to the end of a pipeline where the ordering of the piped elements
+    # is irrelevant.
+    # The only efficient way to consume a stream is to prepend each new element
+    # to list, resulting in reversed output. Enum.reverse(stream, tail) does
+    # this directly. Enum.concat(stream, tail) needs the stream unreversed, so
+    # it needs to build an intermediate list and perform an additional
+    # reversal.
+    sse_endpoints
+    |> Map.values()
+    |> Stream.map(&SSEEndpoint.to_handler/1)
+    |> Enum.reverse([{:_, AddHandler, %AddHandler.State{sse_server: self()}}])
   end
 
   defp update_env(state) do

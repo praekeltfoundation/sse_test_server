@@ -30,7 +30,6 @@ defmodule SSETestServer.AddHandler do
   end
 
   defp perform_action("add_endpoint", fields, req, state) do
-    # TODO: handler_opts
     handler_opts =
       [fn -> get_handler_opt(fields, :response_delay, &String.to_integer/1) end]
       |> Enum.flat_map(&apply(&1, []))

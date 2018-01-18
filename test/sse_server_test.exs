@@ -97,6 +97,34 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_events(task2, [{"yourevent", "yourdata"}])
   end
 
+  test "stream to multiple clients on different endpoints" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events1")
+    :ok = SSEServer.add_endpoint("/events2")
+    task1 = connect_and_collect("/events1")
+    task2 = connect_and_collect("/events2")
+    :ok = SSEServer.event("/events1", "myevent", "mydata")
+    :ok = SSEServer.event("/events2", "yourevent", "yourdata")
+    :ok = SSEServer.end_stream("/events1")
+    :ok = SSEServer.end_stream("/events2")
+    assert_events(task1, [{"myevent", "mydata"}])
+    assert_events(task2, [{"yourevent", "yourdata"}])
+  end
+
+  test "an endpoint that is a prefix of another endpoint" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    :ok = SSEServer.add_endpoint("/events/more")
+    task1 = connect_and_collect("/events")
+    task2 = connect_and_collect("/events/more")
+    :ok = SSEServer.event("/events", "myevent", "mydata")
+    :ok = SSEServer.event("/events/more", "yourevent", "yourdata")
+    :ok = SSEServer.end_stream("/events")
+    :ok = SSEServer.end_stream("/events/more")
+    assert_events(task1, [{"myevent", "mydata"}])
+    assert_events(task2, [{"yourevent", "yourdata"}])
+  end
+
   test "operations on missing endpoints fail gracefully" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :path_not_found = SSEServer.event("/nothing", "myevent", "mydata")
