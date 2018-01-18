@@ -37,8 +37,9 @@ defmodule SSETestServer.AddHandler do
     HU.success(req)
   end
 
-  defp perform_action(action, _fields, req, _state) do
-    HU.bad_request(req, "Unknown action: #{action}")
+  defp perform_action(_action, _fields, req, _state) do
+    # Any action other than "add_endpoint" should 404.
+    :cowboy_req.reply(404, req)
   end
 
   defp get_handler_opt(fields, opt, transform) do

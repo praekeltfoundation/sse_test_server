@@ -211,25 +211,23 @@ defmodule SSETestServerTest.SSEServerTest do
   test "missing HTTP action" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = ControlClient.add_endpoint(url("/events"))
-    {:error, resp} = ControlClient.post(url("/events"), [])
-    %{status_code: 400, body: "Missing field: action"} = resp
+    assert_control_err("Missing field: action", 400,
+      ControlClient.post(url("/events"), []))
   end
 
   @tag :http_api
   test "bad HTTP action" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = ControlClient.add_endpoint(url("/events"))
-    {:error, resp} = ControlClient.post(
-      "#{SSEServer.base_url()}/events", action: "brew_coffee")
-    %{status_code: 400, body: "Unknown action: brew_coffee"} = resp
+    assert_control_err("Unknown action: brew_coffee", 400,
+      ControlClient.post(url("/events"), action: "brew_coffee"))
   end
 
   @tag :http_api
   test "stream action on missing endpoint" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    {:error, resp} = ControlClient.post(
-      "#{SSEServer.base_url()}/nothing", action: "keepalive")
-    %{status_code: 400, body: "Unknown action: keepalive"} = resp
+    assert_control_err("", 404,
+      ControlClient.post(url("/nothing"), action: "keepalive"))
   end
 
   @tag :http_api
