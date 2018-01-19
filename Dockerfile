@@ -2,7 +2,7 @@
 # Build stage #
 ###############
 
-FROM elixir:1.5-alpine AS builder
+FROM elixir:1.6-alpine AS builder
 
 WORKDIR /build
 
