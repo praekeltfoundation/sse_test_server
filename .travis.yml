@@ -9,3 +9,38 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+
+jobs:
+  include:
+    - elixir: '1.5'
+      otp_release: '19.0'
+
+    - sudo: required
+      group: trusty_latest
+      services: docker
+      language: python
+
+      env:
+        - IMAGE_NAME=praekeltfoundation/sse_test_server
+        - REGISTRY_USER=praekeltorgdeploy
+        - REGISTRY_PASS=secret  # TODO
+
+      before_script:
+        - docker pull "$IMAGE_NAME:develop" || true
+      script:
+        - docker build --pull --cache-from "$IMAGE_NAME:develop" -t "$IMAGE_NAME" .
+      after_script:
+        - docker images
+
+      before_deploy:
+        - pip install docker-ci-deploy==0.3.0
+        - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"
+      deploy:
+        provider: script
+        script: dcd -t develop -V "$(git rev-parse --short HEAD)" -L "$IMAGE_NAME"
+        on:
+          branch: develop
+
+      # Clear unused build stages
+      after_success: []
+      install: []

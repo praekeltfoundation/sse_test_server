@@ -43,6 +43,7 @@ defmodule SSETestServer.Mixfile do
       {:hackney, "~> 1.9.0", only: :test},
       {:httpoison, "~> 0.13", only: :test},
       {:excoveralls, "~> 0.7", only: :test},
+      {:distillery, "~> 1.5", runtime: :false},
     ]
   end
 end
