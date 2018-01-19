@@ -75,6 +75,30 @@ defmodule SSEClient do
 
 end
 
+defmodule ControlClient do
+  def post(url, params) do
+    body = {:form, params |> Enum.map(fn {k, v} -> {to_string(k), v} end)}
+    case HTTPoison.post(url, body) do
+      {:ok, %{status_code: 204, body: ""}} -> :ok
+      {:ok, resp} -> {:error, resp}
+      {:error, err} -> {:error, err}
+    end
+  end
+
+  def add_endpoint(url, handler_opts \\ []),
+    do: post(url, [{:action, "add_endpoint"} | handler_opts])
+
+  def stream_bytes(url, bytes),
+    do: post(url, action: "stream_bytes", bytes: bytes)
+
+  def keepalive(url), do: post(url, action: "keepalive")
+
+  def event(url, event, data),
+    do: post(url, action: "event", event: event, data: data)
+
+  def end_stream(url), do: post(url, action: "end_stream")
+end
+
 # We don't start applications during tests because we don't want our own app
 # running, but we do need all its dependencies running.
 Application.load(:sse_test_server)

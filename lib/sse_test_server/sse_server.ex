@@ -10,11 +10,11 @@ defmodule SSETestServer.SSEServer do
   with `event/4` and `keepalive/2`. All connections to an endpoint can be
   closed with `end_stream/2`.
 
-  TODO: Allow endpoints to be created and managed over HTTP.
+  TODO: Document HTTP API.
   """
   use GenServer
 
-  alias SSETestServer.SSEHandler
+  alias SSETestServer.{AddHandler, SSEHandler}
 
   defmodule State do
     defstruct listener: nil, port: nil, sse_endpoints: %{}
@@ -76,7 +76,7 @@ defmodule SSETestServer.SSEServer do
     Process.flag(:trap_exit, true)
     listener_ref = make_ref()
     ranch_args = args |> Enum.filter(fn {k, _} -> k in [:port] end)
-    dispatch = :cowboy_router.compile([{:_, []}])
+    dispatch = :cowboy_router.compile([{:_, handlers_for_endpoints()}])
     {:ok, listener} = :cowboy.start_clear(
       listener_ref, ranch_args, %{env: %{dispatch: dispatch}})
     Process.link(listener)
@@ -88,12 +88,24 @@ defmodule SSETestServer.SSEServer do
     update_env(%State{state | sse_endpoints: new_endpoints})
   end
 
+  defp handlers_for_endpoints(sse_endpoints \\ %{}) do
+    # Although the list of endpoints is almost certainly small enough to render
+    # this optimisation moot, I used it because I think it's a neat way to
+    # append to the end of a pipeline where the ordering of the piped elements
+    # is irrelevant.
+    # The only efficient way to consume a stream is to prepend each new element
+    # to list, resulting in reversed output. Enum.reverse(stream, tail) does
+    # this directly. Enum.concat(stream, tail) needs the stream unreversed, so
+    # it needs to build an intermediate list and perform an additional
+    # reversal.
+    sse_endpoints
+    |> Map.values()
+    |> Stream.map(&SSEEndpoint.to_handler/1)
+    |> Enum.reverse([{:_, AddHandler, %AddHandler.State{sse_server: self()}}])
+  end
+
   defp update_env(state) do
-    handlers =
-      state.sse_endpoints
-      |> Map.values
-      |> Enum.map(&SSEEndpoint.to_handler/1)
-      |> Enum.sort
+    handlers = handlers_for_endpoints(state.sse_endpoints)
     dispatch = :cowboy_router.compile([{:_, handlers}])
     :cowboy.set_env(state.listener, :dispatch, dispatch)
     state
