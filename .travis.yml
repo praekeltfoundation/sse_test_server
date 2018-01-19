@@ -1,8 +1,5 @@
 language: elixir
 
-elixir: '1.5'
-otp_release: '19.0'
-
 script:
   # This is basically `mix test` with coverage enabled.
   - mix coveralls.json
@@ -23,7 +20,7 @@ jobs:
       env:
         - IMAGE_NAME=praekeltfoundation/sse_test_server
         - REGISTRY_USER=praekeltorgdeploy
-        - REGISTRY_PASS=secret  # TODO
+        - secure: "Jm5c+TcYfpwrcIbsiPYHVUk0mF0myxthww4DXkvkwasZ9G81P6GwV4YWnk2BINvq4sqLbaXMbdhiAXL5dWkyY8Vls2+Wz8G31e3i2KSMazJMA2RMKdp7ark1nQL4T4sWOwsBcYrNGnIKVJFHvMOWc1rn8KjR53qP0ksC7C8Sa9kkYbMpfmVqd+EzJIfpvhKYs+wxPgVJPaMFERiF8VaLik37Nqt6DJJ8KDj51F7iSZtYmYc1oHO0or7LeMMqLJ2ai7Jcnu3wDV4zIQk6a7M1bzge7vbk99eA39gFxD6isf+2hHlM70+hCJUkCxlRmBzrxlYlk80JtQ/LQQEjqtbuimlQKpGWaduhDBmrsmj7eiD4rsxnA39swyLB/BFXF+PQIMWF5oObBJ4vRzlW1vAgEVNvhVGXjuo8RXkhCKF7qzfr4C1du3BefHGWa0SX/yN2iWFw6O7CkaHwc3yuosJYlPHoZtin3TNcMPa9QSz4Yq7hiVw/NL5RxKJpZQehiE6sUuGKj1IpokbkGvmSkggNYOqtuLdGn9qHudJrWBEdH1oEEfTVQ4c+1ochCEahK5oTEZbgzIuFFpaW3dR/OrQ7KJlsfMfhGKIeCIEN60EbByT8QI54HjkUQtijuUOvB7+Ysxx26pyGHlBz3nyZMeUPPdEbi4XsTkYbtaRmBPMyWew="
 
       before_script:
         - docker pull "$IMAGE_NAME:develop" || true
