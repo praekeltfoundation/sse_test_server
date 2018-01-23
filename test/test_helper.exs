@@ -76,17 +76,21 @@ defmodule SSEClient do
 end
 
 defmodule ControlClient do
-  def post(url, params) do
+  def request(method, url, params) do
     body = {:form, params |> Enum.map(fn {k, v} -> {to_string(k), v} end)}
-    case HTTPoison.post(url, body) do
+    case HTTPoison.request(method, url, body) do
+      {:ok, %{status_code: 201, body: ""}} -> :ok
       {:ok, %{status_code: 204, body: ""}} -> :ok
       {:ok, resp} -> {:error, resp}
       {:error, err} -> {:error, err}
     end
   end
 
-  def add_endpoint(url, handler_opts \\ []),
-    do: post(url, [{:action, "add_endpoint"} | handler_opts])
+  def put(url, params), do: request("PUT", url, params)
+
+  def post(url, params), do: request("POST", url, params)
+
+  def add_endpoint(url, handler_opts \\ []), do: put(url, handler_opts)
 
   def stream_bytes(url, bytes),
     do: post(url, action: "stream_bytes", bytes: bytes)
