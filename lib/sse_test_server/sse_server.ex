@@ -104,7 +104,7 @@ defmodule SSETestServer.SSEServer do
   def handle_call({:sse_stream, path, pid}, _from, state) do
     endpoint = Map.fetch!(state.sse_endpoints, path)
     new_endpoint = %{endpoint | streams: [pid | endpoint.streams]}
-    {:reply, {:ok, new_endpoint}, update_endpoint(state, new_endpoint)}
+    {:reply, :ok, update_endpoint(state, new_endpoint)}
   end
 
   def handle_call({:add_endpoint, path, handler_opts}, _from, state) do

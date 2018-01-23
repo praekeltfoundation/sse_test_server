@@ -6,10 +6,7 @@ defmodule SSETestServer.RequestHandler do
   allow testing clients that don't handle transport-encodings transparently.
   """
 
-  # We implement both of these behaviours, but we only delcare one of them
-  # because they overlap.
-  @behaviour :cowboy_rest
-  # @behaviour :cowboy_loop
+  @behaviour :cowboy_loop
 
   alias SSETestServer.SSEServer
 
@@ -23,82 +20,77 @@ defmodule SSETestServer.RequestHandler do
     defstruct path: nil, sse_server: nil, response_delay: nil
   end
 
-  def init(req, state) do
-    {:cowboy_rest, req, state}
+  def init(req = %{method: "PUT"}, state) do
+    {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
+    handle_put_endpoint(Map.new(field_list), req_read, state)
   end
 
-  def allowed_methods(req, state),
-    do: {["GET", "HEAD", "OPTIONS", "PUT", "POST"], req, state}
+  def init(req = %{method: "GET"}, state) do
+    when_exists(req, state, fn endpoint ->
+      case :cowboy_req.parse_header("accept", req) do
+        [{{"text", "event-stream", _}, _, _}] ->
+          handle_sse_stream(req, state, endpoint.handler_state)
+        _ -> {:ok, :cowboy_req.reply(406, req), state}
+      end
+    end)
+  end
 
-  def allow_missing_post(req, state), do: {false, req, state}
+  def init(req = %{method: "POST"}, state) do
+    when_exists(req, state, fn _ ->
+      {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
+      handle_action(Map.new(field_list), req_read, state)
+    end)
+  end
 
-  def resource_exists(req, state) do
+  def handle_sse_stream(req, state, sse_state) do
+    :ok = SSEServer.sse_stream(state.sse_server, req.path, self())
+    # sse_state.response_delay is nil (falsey) or an integer (truthy).
+    if sse_state.response_delay, do: Process.sleep(sse_state.response_delay)
+    req_resp = :cowboy_req.stream_reply(
+      200, %{"content-type" => "text/event-stream"}, req)
+    {:cowboy_loop, req_resp, sse_state}
+  end
+
+  defp when_exists(req, state, fun) do
     case SSEServer.get_endpoint(state.sse_server, req.path) do
-      {:ok, _} -> {true, req, state}
-      :error -> {false, req, state}
+      {:ok, endpoint} -> fun.(endpoint)
+      :error -> {:ok, :cowboy_req.reply(404, req), state}
     end
   end
 
-  def content_types_provided(req, state),
-    do: {[{{"text", "event-stream", :*}, :to_sse_stream}], req, state}
-
-  def to_sse_stream(req, state) do
-    {:ok, endpoint} = SSEServer.sse_stream(state.sse_server, req.path, self())
-    sse_state = endpoint.handler_state
-    # sse_state.response_delay is nil (falsey) or an integer (truthy).
-    if sse_state.response_delay, do: Process.sleep(sse_state.response_delay)
-    new_req = :cowboy_req.stream_reply(
-      200, %{"content-type" => "text/event-stream"}, req)
-    {{:switch_handler, :cowboy_loop}, new_req, sse_state}
-  end
-
-  def content_types_accepted(req, state),
-    do: {[{{"application", "x-www-form-urlencoded", :*}, :from_form}], req, state}
-
-  def from_form(req, state) do
-    {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
-    handle_action(Map.new(field_list), req_read, state)
-  end
-
-  defp handle_action(fields, req = %{method: "PUT"}, state) do
+  defp handle_put_endpoint(fields, req, state) do
     handler_opts =
       [fn -> get_handler_opt(fields, :response_delay, &String.to_integer/1) end]
       |> Enum.flat_map(&apply(&1, []))
     SSEServer.add_endpoint(state.sse_server, req.path, handler_opts)
-    {true, req, state}
+    {:ok, :cowboy_req.reply(201, req), state}
   end
 
   defp handle_action(fields, req, state) do
-    {success, req_resp} = process_field(
+    req_resp = process_field(
       "action", fields, req, &perform_action(&1, &2, req, state))
-    {success, req_resp, state}
+    {:ok, req_resp, state}
   end
 
   defp perform_action("stream_bytes", fields, req, state) do
     process_field("bytes", fields, req,
       fn bytes, _ ->
-        SSEServer.stream_bytes(state.sse_server, req.path, bytes)
-        {true, req}
+        success(req, SSEServer.stream_bytes(state.sse_server, req.path, bytes))
       end)
   end
 
-  defp perform_action("keepalive", _fields, req, state) do
-    SSEServer.keepalive(state.sse_server, req.path)
-    {true, req}
-  end
+  defp perform_action("keepalive", _fields, req, state),
+    do: success(req, SSEServer.keepalive(state.sse_server, req.path))
 
   defp perform_action("event", fields, req, state) do
     process_fields(["event", "data"], fields, req,
       fn [event, data], _ ->
-        SSEServer.event(state.sse_server, req.path, event, data)
-        {true, req}
+        success(req, SSEServer.event(state.sse_server, req.path, event, data))
       end)
   end
 
-  defp perform_action("end_stream", _fields, req, state) do
-    SSEServer.end_stream(state.sse_server, req.path)
-    {true, req}
-  end
+  defp perform_action("end_stream", _fields, req, state),
+    do: success(req, SSEServer.end_stream(state.sse_server, req.path))
 
   defp perform_action(action, _fields, req, _state),
     do: bad_request(req, "Unknown action: #{action}")
@@ -110,7 +102,9 @@ defmodule SSETestServer.RequestHandler do
     end
   end
 
-  defp bad_request(req, msg), do: {false, :cowboy_req.set_resp_body(msg, req)}
+  defp success(req, :ok), do: :cowboy_req.reply(204, req)
+
+  defp bad_request(req, msg), do: :cowboy_req.reply(400, %{}, msg, req)
 
   defp process_field(field, fields, req, fun) do
     case Map.pop(fields, field) do
@@ -139,9 +133,7 @@ defmodule SSETestServer.RequestHandler do
     {:ok, req, state}
   end
 
-  def info(:close, req, state) do
-    {:stop, req, state}
-  end
+  def info(:close, req, state), do: {:stop, req, state}
 
   def send_info(handler, thing), do: send(handler, thing)
 

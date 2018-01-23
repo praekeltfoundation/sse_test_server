@@ -18,6 +18,20 @@ defmodule SSETestServerTest.SSEServerTest do
     assert_response(task, "", 404, [])
   end
 
+  test "stream missing accept header" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    {:ok, resp} = HTTPoison.get(url("/events"))
+    assert_response(resp, "", 406, [])
+  end
+
+  test "stream bad accept header" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+    :ok = SSEServer.add_endpoint("/events")
+    {:ok, resp} = HTTPoison.get(url("/events"), %{"Accept" => "text/html"})
+    assert_response(resp, "", 406, [])
+  end
+
   test "stream no data" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = SSEServer.add_endpoint("/events")
