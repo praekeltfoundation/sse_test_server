@@ -22,15 +22,16 @@ defmodule SSETestServer.SSEServer do
 
   defmodule SSEEndpoint do
     @enforce_keys [:path]
-    defstruct path: nil, handler_state: nil, streams: []
+    defstruct path: nil, stream_state: nil, streams: []
 
-    def new(path, handler_opts \\ []) do
-      handler_state = %RequestHandler.StreamState{path: path, sse_server: self()}
-      %__MODULE__{
-        path: path,
-        handler_state: Map.merge(handler_state, Map.new(handler_opts)),
-      }
-    end
+    defp stream_state(path, opts),
+      do: RequestHandler.StreamState.new(path, self(), opts)
+
+    def configure(path, opts, nil),
+      do: configure(path, opts, %__MODULE__{path: path})
+
+    def configure(path, opts, endpoint),
+      do: %{endpoint | stream_state: stream_state(path, opts)}
   end
 
   ## Client API
@@ -108,7 +109,8 @@ defmodule SSETestServer.SSEServer do
   end
 
   def handle_call({:add_endpoint, path, handler_opts}, _from, state) do
-    endpoint = SSEEndpoint.new(path, handler_opts)
+    old_endpoint = Map.get(state.sse_endpoints, path)
+    endpoint = SSEEndpoint.configure(path, handler_opts, old_endpoint)
     {:reply, :ok, update_endpoint(state, endpoint)}
   end
 

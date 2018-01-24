@@ -15,9 +15,18 @@ defmodule SSETestServer.RequestHandler do
     defstruct sse_server: nil, path: nil
   end
 
+  defmodule StreamOpts do
+    defstruct response_delay: 0
+  end
+
   defmodule StreamState do
     @enforce_keys [:path, :sse_server]
-    defstruct path: nil, sse_server: nil, response_delay: nil
+    defstruct path: nil, sse_server: nil, opts: %StreamOpts{}
+
+    def new(path, sse_server, opts) do
+      stream_opts = struct!(StreamOpts, opts)
+      %__MODULE__{path: path, sse_server: sse_server, opts: stream_opts}
+    end
   end
 
   def init(req = %{method: "PUT"}, state) do
@@ -29,7 +38,7 @@ defmodule SSETestServer.RequestHandler do
     when_exists(req, state, fn endpoint ->
       case :cowboy_req.parse_header("accept", req) do
         [{{"text", "event-stream", _}, _, _}] ->
-          handle_sse_stream(req, state, endpoint.handler_state)
+          handle_sse_stream(req, state, endpoint.stream_state)
         _ -> {:ok, :cowboy_req.reply(406, req), state}
       end
     end)
@@ -42,13 +51,12 @@ defmodule SSETestServer.RequestHandler do
     end)
   end
 
-  def handle_sse_stream(req, state, sse_state) do
+  def handle_sse_stream(req, state, stream_state = %{opts: opts}) do
     :ok = SSEServer.sse_stream(state.sse_server, req.path, self())
-    # sse_state.response_delay is nil (falsey) or an integer (truthy).
-    if sse_state.response_delay, do: Process.sleep(sse_state.response_delay)
+    if opts.response_delay > 0, do: Process.sleep(opts.response_delay)
     req_resp = :cowboy_req.stream_reply(
       200, %{"content-type" => "text/event-stream"}, req)
-    {:cowboy_loop, req_resp, sse_state}
+    {:cowboy_loop, req_resp, stream_state}
   end
 
   defp when_exists(req, state, fun) do

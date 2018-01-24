@@ -12,6 +12,12 @@ defmodule SSETestServerTest.SSEServerTest do
   def assert_control_err(body, code, {:error, resp}),
     do: assert_response(resp, body, code, [])
 
+  # This value is used for tests that measure responsese delays. The response
+  # time (on my machine, at least) with no configured delay is consistently
+  # under 100ms. I chose 250ms here as a balance between incorrect results and
+  # waiting too long.
+  @delay_ms 250
+
   test "unconfigured endpoints 404" do
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     task = connect_and_collect("/nothing")
@@ -147,13 +153,8 @@ defmodule SSETestServerTest.SSEServerTest do
   end
 
   test "configurable response delay" do
-    # On my machine, the response time with no configured delay is consistently
-    # under 100ms. I chose 250ms here as a balance between incorrect results
-    # and waiting too long.
-    delay_ms = 250
-
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
-    :ok = SSEServer.add_endpoint("/delayed_events", response_delay: delay_ms)
+    :ok = SSEServer.add_endpoint("/delayed_events", response_delay: @delay_ms)
     :ok = SSEServer.add_endpoint("/events")
 
     # Delayed endpoint.
@@ -162,7 +163,7 @@ defmodule SSETestServerTest.SSEServerTest do
     de1 = Time.utc_now()
     :ok = SSEServer.end_stream("/delayed_events")
     assert_response(detask, "", 200)
-    assert Time.diff(de1, de0, :milliseconds) >= delay_ms
+    assert Time.diff(de1, de0, :milliseconds) >= @delay_ms
 
     # Non-delayed endpoint as a control.
     e0 = Time.utc_now()
@@ -170,7 +171,31 @@ defmodule SSETestServerTest.SSEServerTest do
     e1 = Time.utc_now()
     :ok = SSEServer.end_stream("/events")
     assert_response(etask, "", 200)
-    assert Time.diff(e1, e0, :milliseconds) < delay_ms
+    assert Time.diff(e1, e0, :milliseconds) < @delay_ms
+  end
+
+  test "reconfigure endpoint" do
+    {:ok, _} = start_supervised {SSEServer, [port: 0]}
+
+    # Start with no configured delay.
+    :ok = SSEServer.add_endpoint("/events")
+    t1_0 = Time.utc_now()
+    task1 = connect_and_collect("/events")
+    t1_1 = Time.utc_now()
+    assert Time.diff(t1_1, t1_0, :milliseconds) < @delay_ms
+
+    # Reconfigure to add a response delay.
+    :ok = SSEServer.add_endpoint("/events", response_delay: @delay_ms)
+    t2_0 = Time.utc_now()
+    task2 = connect_and_collect("/events")
+    t2_1 = Time.utc_now()
+    assert Time.diff(t2_1, t2_0, :milliseconds) >= @delay_ms
+
+    # Send an event and confirm that both connected clients receive it.
+    :ok = SSEServer.event("/events", "myevent", "mydata")
+    :ok = SSEServer.end_stream("/events")
+    assert_events(task1, [{"myevent", "mydata"}])
+    assert_events(task2, [{"myevent", "mydata"}])
   end
 
   test "reference SSEServer by pid" do
@@ -194,14 +219,9 @@ defmodule SSETestServerTest.SSEServerTest do
 
   @tag :http_api
   test "create endpoint with response delay over HTTP" do
-    # On my machine, the response time with no configured delay is consistently
-    # under 100ms. I chose 250ms here as a balance between incorrect results
-    # and waiting too long.
-    delay_ms = 250
-
     {:ok, _} = start_supervised {SSEServer, [port: 0]}
     :ok = ControlClient.add_endpoint(
-      url("/delayed_events"), response_delay: delay_ms)
+      url("/delayed_events"), response_delay: @delay_ms)
     :ok = ControlClient.add_endpoint(url("/events"))
 
     # Delayed endpoint.
@@ -210,7 +230,7 @@ defmodule SSETestServerTest.SSEServerTest do
     de1 = Time.utc_now()
     :ok = ControlClient.end_stream(url("/delayed_events"))
     assert_response(detask, "", 200)
-    assert Time.diff(de1, de0, :milliseconds) >= delay_ms
+    assert Time.diff(de1, de0, :milliseconds) >= @delay_ms
 
     # Non-delayed endpoint as a control.
     e0 = Time.utc_now()
@@ -218,7 +238,7 @@ defmodule SSETestServerTest.SSEServerTest do
     e1 = Time.utc_now()
     :ok = ControlClient.end_stream(url("/events"))
     assert_response(etask, "", 200)
-    assert Time.diff(e1, e0, :milliseconds) < delay_ms
+    assert Time.diff(e1, e0, :milliseconds) < @delay_ms
   end
 
   @tag :http_api
