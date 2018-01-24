@@ -5,16 +5,16 @@ defmodule SSETestServer.SSEServer do
   `SSETestServer.SSEServer` manages configurable Server-Sent Event endpoints,
   where each endpoint has its own HTTP path.
 
-  Endpoints are created and configured by calling `add_endpoint/2` (or
-  `add_endpoint/3`). Once an endpoint exists, events and keepalives can be sent
-  with `event/4` and `keepalive/2`. All connections to an endpoint can be
-  closed with `end_stream/2`.
+  Endpoints are created and configured by calling `configure_endpoint/2` (or
+  `configure_endpoint/3`). Once an endpoint exists, events and keepalives can
+  be sent with `event/4` and `keepalive/2`. All connections to an endpoint can
+  be closed with `end_stream/2`.
 
   TODO: Document HTTP API.
   """
   use GenServer
 
-  alias SSETestServer.{AddHandler, SSEHandler}
+  alias SSETestServer.RequestHandler
 
   defmodule State do
     defstruct listener: nil, port: nil, sse_endpoints: %{}
@@ -22,18 +22,16 @@ defmodule SSETestServer.SSEServer do
 
   defmodule SSEEndpoint do
     @enforce_keys [:path]
-    defstruct path: nil, handler_state: nil, streams: []
+    defstruct path: nil, stream_state: nil, streams: []
 
-    def new(path, handler_opts \\ []) do
-      handler_state = %SSEHandler.State{path: path, sse_server: self()}
-      %__MODULE__{
-        path: path,
-        handler_state: Map.merge(handler_state, Map.new(handler_opts)),
-      }
-    end
+    defp stream_state(path, opts),
+      do: RequestHandler.StreamState.new(path, self(), opts)
 
-    def to_handler(endpoint),
-      do: {endpoint.path, SSEHandler, endpoint.handler_state}
+    def configure(path, opts, nil),
+      do: configure(path, opts, %__MODULE__{path: path})
+
+    def configure(path, opts, endpoint),
+      do: %{endpoint | stream_state: stream_state(path, opts)}
   end
 
   ## Client API
@@ -46,11 +44,11 @@ defmodule SSETestServer.SSEServer do
 
   # We can't default both `sse` and `handler_opts`, so the latter is required
   # if the former is provided.
-  def add_endpoint(sse, path, handler_opts),
-    do: GenServer.call(sse, {:add_endpoint, path, handler_opts})
+  def configure_endpoint(sse, path, handler_opts),
+    do: GenServer.call(sse, {:configure_endpoint, path, handler_opts})
 
-  def add_endpoint(path, handler_opts \\ []),
-    do: add_endpoint(:sse_test_server, path, handler_opts)
+  def configure_endpoint(path, handler_opts \\ []),
+    do: configure_endpoint(:sse_test_server, path, handler_opts)
 
   def event(sse \\ :sse_test_server, path, event, data),
     do: GenServer.call(sse, {:event, path, event, data})
@@ -66,6 +64,9 @@ defmodule SSETestServer.SSEServer do
 
   ## Internal client API
 
+  def get_endpoint(sse, path),
+    do: GenServer.call(sse, {:get_endpoint, path})
+
   def sse_stream(sse, path, pid),
     do: GenServer.call(sse, {:sse_stream, path, pid})
 
@@ -76,39 +77,14 @@ defmodule SSETestServer.SSEServer do
     Process.flag(:trap_exit, true)
     listener_ref = make_ref()
     ranch_args = args |> Enum.filter(fn {k, _} -> k in [:port] end)
-    dispatch = :cowboy_router.compile([{:_, handlers_for_endpoints()}])
+    dispatch = :cowboy_router.compile(
+      [{:_, [
+           {:_, RequestHandler, %RequestHandler.State{sse_server: self()}},
+         ]}])
     {:ok, listener} = :cowboy.start_clear(
       listener_ref, ranch_args, %{env: %{dispatch: dispatch}})
     Process.link(listener)
     {:ok, %State{listener: listener_ref, port: :ranch.get_port(listener_ref)}}
-  end
-
-  defp set_endpoint(state, endpoint) do
-    new_endpoints = Map.put(state.sse_endpoints, endpoint.path, endpoint)
-    update_env(%State{state | sse_endpoints: new_endpoints})
-  end
-
-  defp handlers_for_endpoints(sse_endpoints \\ %{}) do
-    # Although the list of endpoints is almost certainly small enough to render
-    # this optimisation moot, I used it because I think it's a neat way to
-    # append to the end of a pipeline where the ordering of the piped elements
-    # is irrelevant.
-    # The only efficient way to consume a stream is to prepend each new element
-    # to list, resulting in reversed output. Enum.reverse(stream, tail) does
-    # this directly. Enum.concat(stream, tail) needs the stream unreversed, so
-    # it needs to build an intermediate list and perform an additional
-    # reversal.
-    sse_endpoints
-    |> Map.values()
-    |> Stream.map(&SSEEndpoint.to_handler/1)
-    |> Enum.reverse([{:_, AddHandler, %AddHandler.State{sse_server: self()}}])
-  end
-
-  defp update_env(state) do
-    handlers = handlers_for_endpoints(state.sse_endpoints)
-    dispatch = :cowboy_router.compile([{:_, handlers}])
-    :cowboy.set_env(state.listener, :dispatch, dispatch)
-    state
   end
 
   def terminate(reason, state) do
@@ -116,19 +92,26 @@ defmodule SSETestServer.SSEServer do
     reason
   end
 
+  defp update_endpoint(state, endpoint) do
+    new_endpoints = Map.put(state.sse_endpoints, endpoint.path, endpoint)
+    %State{state | sse_endpoints: new_endpoints}
+  end
+
   def handle_call(:port, _from, state), do: {:reply, state.port, state}
+
+  def handle_call({:get_endpoint, path}, _from, state),
+    do: {:reply, Map.fetch(state.sse_endpoints, path), state}
 
   def handle_call({:sse_stream, path, pid}, _from, state) do
     endpoint = Map.fetch!(state.sse_endpoints, path)
     new_endpoint = %{endpoint | streams: [pid | endpoint.streams]}
-    new_endpoints = Map.put(state.sse_endpoints, path, new_endpoint)
-    new_state = %{state | sse_endpoints: new_endpoints}
-    {:reply, :ok, new_state}
+    {:reply, :ok, update_endpoint(state, new_endpoint)}
   end
 
-  def handle_call({:add_endpoint, path, handler_opts}, _from, state) do
-    new_endpoint = SSEEndpoint.new(path, handler_opts)
-    {:reply, :ok, set_endpoint(state, new_endpoint)}
+  def handle_call({:configure_endpoint, path, handler_opts}, _from, state) do
+    old_endpoint = Map.get(state.sse_endpoints, path)
+    endpoint = SSEEndpoint.configure(path, handler_opts, old_endpoint)
+    {:reply, :ok, update_endpoint(state, endpoint)}
   end
 
   def handle_call({:stream_bytes, path, bytes}, _from, state),
@@ -149,7 +132,7 @@ defmodule SSETestServer.SSEServer do
     case Map.fetch(state.sse_endpoints, path) do
       :error -> {:reply, :path_not_found, state}
       {:ok, %{streams: streams}} ->
-        Enum.each(streams, &SSEHandler.send_info(&1, thing))
+        Enum.each(streams, &RequestHandler.send_info(&1, thing))
         {:reply, :ok, state}
     end
   end
