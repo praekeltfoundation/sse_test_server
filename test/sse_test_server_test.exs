@@ -8,7 +8,7 @@ defmodule SSETestServerTest do
   test "application starts properly" do
     :ok = Application.start(:sse_test_server)
     on_exit(fn -> Application.stop(:sse_test_server) end)
-    :ok = SSEServer.add_endpoint("/events")
+    :ok = SSEServer.configure_endpoint("/events")
     task = SSEClient.connect_and_collect("#{SSEServer.base_url()}/events")
     :ok = SSEServer.event("/events", "myevent", "mydata")
     :ok = SSEServer.end_stream("/events")

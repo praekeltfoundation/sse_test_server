@@ -70,7 +70,7 @@ defmodule SSETestServer.RequestHandler do
     handler_opts =
       [fn -> get_handler_opt(fields, :response_delay, &String.to_integer/1) end]
       |> Enum.flat_map(&apply(&1, []))
-    SSEServer.add_endpoint(state.sse_server, req.path, handler_opts)
+    SSEServer.configure_endpoint(state.sse_server, req.path, handler_opts)
     {:ok, :cowboy_req.reply(201, req), state}
   end
 

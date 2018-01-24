@@ -5,10 +5,10 @@ defmodule SSETestServer.SSEServer do
   `SSETestServer.SSEServer` manages configurable Server-Sent Event endpoints,
   where each endpoint has its own HTTP path.
 
-  Endpoints are created and configured by calling `add_endpoint/2` (or
-  `add_endpoint/3`). Once an endpoint exists, events and keepalives can be sent
-  with `event/4` and `keepalive/2`. All connections to an endpoint can be
-  closed with `end_stream/2`.
+  Endpoints are created and configured by calling `configure_endpoint/2` (or
+  `configure_endpoint/3`). Once an endpoint exists, events and keepalives can
+  be sent with `event/4` and `keepalive/2`. All connections to an endpoint can
+  be closed with `end_stream/2`.
 
   TODO: Document HTTP API.
   """
@@ -44,11 +44,11 @@ defmodule SSETestServer.SSEServer do
 
   # We can't default both `sse` and `handler_opts`, so the latter is required
   # if the former is provided.
-  def add_endpoint(sse, path, handler_opts),
-    do: GenServer.call(sse, {:add_endpoint, path, handler_opts})
+  def configure_endpoint(sse, path, handler_opts),
+    do: GenServer.call(sse, {:configure_endpoint, path, handler_opts})
 
-  def add_endpoint(path, handler_opts \\ []),
-    do: add_endpoint(:sse_test_server, path, handler_opts)
+  def configure_endpoint(path, handler_opts \\ []),
+    do: configure_endpoint(:sse_test_server, path, handler_opts)
 
   def event(sse \\ :sse_test_server, path, event, data),
     do: GenServer.call(sse, {:event, path, event, data})
@@ -108,7 +108,7 @@ defmodule SSETestServer.SSEServer do
     {:reply, :ok, update_endpoint(state, new_endpoint)}
   end
 
-  def handle_call({:add_endpoint, path, handler_opts}, _from, state) do
+  def handle_call({:configure_endpoint, path, handler_opts}, _from, state) do
     old_endpoint = Map.get(state.sse_endpoints, path)
     endpoint = SSEEndpoint.configure(path, handler_opts, old_endpoint)
     {:reply, :ok, update_endpoint(state, endpoint)}

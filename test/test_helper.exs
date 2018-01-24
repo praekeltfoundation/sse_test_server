@@ -90,7 +90,7 @@ defmodule ControlClient do
 
   def post(url, params), do: request("POST", url, params)
 
-  def add_endpoint(url, handler_opts \\ []), do: put(url, handler_opts)
+  def configure_endpoint(url, handler_opts \\ []), do: put(url, handler_opts)
 
   def stream_bytes(url, bytes),
     do: post(url, action: "stream_bytes", bytes: bytes)
