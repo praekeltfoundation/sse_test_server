@@ -1,15 +1,14 @@
 defmodule SSETestServer.SSEHandler do
   @moduledoc """
-  HTTP request handler for everything.
+  SSE stream handler.
 
   TODO: Find a way to get rid of the chunk wrappers around all this stuff to
   allow testing clients that don't handle transport-encodings transparently.
   """
 
-  @behaviour :cowboy_sub_protocol
-  @behaviour :cowboy_loop
+  use SSETestServer.RequestHandler.Base
 
-  use SSETestServer.RequestHandler.Utils
+  @behaviour :cowboy_loop
 
   defmodule StreamOpts do
     defstruct response_delay: 0
@@ -24,13 +23,6 @@ defmodule SSETestServer.SSEHandler do
       %__MODULE__{path: path, sse_server: sse_server, opts: stream_opts}
     end
   end
-
-  def upgrade(req, env, handler, handler_opts),
-    do: upgrade(req, env, handler, handler_opts, nil)
-
-  def upgrade(req, env, _handler, handler_opts, _opts),
-    do: :cowboy_handler.execute(
-          req, %{env | handler: __MODULE__, handler_opts: handler_opts})
 
   def init(req = %{method: "GET"}, state) do
     when_exists(req, state, fn endpoint ->

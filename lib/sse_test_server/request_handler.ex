@@ -1,9 +1,18 @@
 defmodule SSETestServer.RequestHandler do
 
-  defmodule Utils do
+  defmodule Base do
     defmacro __using__([]) do
       quote do
+        @behaviour :cowboy_sub_protocol
+
         alias SSETestServer.SSEServer
+
+        def upgrade(req, env, handler, handler_opts),
+          do: upgrade(req, env, handler, handler_opts, nil)
+
+        def upgrade(req, env, _handler, handler_opts, _opts),
+          do: :cowboy_handler.execute(
+                req, %{env | handler: __MODULE__, handler_opts: handler_opts})
 
         defp when_exists(req, state, fun) do
           case SSEServer.get_endpoint(state.sse_server, req.path) do

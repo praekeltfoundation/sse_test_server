@@ -1,16 +1,8 @@
 defmodule SSETestServer.PutHandler do
 
-  @behaviour :cowboy_sub_protocol
+  use SSETestServer.RequestHandler.Base
+
   @behaviour :cowboy_handler
-
-  use SSETestServer.RequestHandler.Utils
-
-  def upgrade(req, env, handler, handler_opts),
-    do: upgrade(req, env, handler, handler_opts, nil)
-
-  def upgrade(req, env, _handler, handler_opts, _opts),
-    do: :cowboy_handler.execute(
-          req, %{env | handler: __MODULE__, handler_opts: handler_opts})
 
   def init(req = %{method: "PUT"}, state) do
     {:ok, field_list, req_read} = :cowboy_req.read_urlencoded_body(req)
