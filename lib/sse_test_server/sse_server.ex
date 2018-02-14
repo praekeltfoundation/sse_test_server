@@ -14,7 +14,7 @@ defmodule SSETestServer.SSEServer do
   """
   use GenServer
 
-  alias SSETestServer.SSEHandler
+  alias SSETestServer.{RequestHandler,SSEHandler}
 
   defmodule State do
     defstruct sse_endpoints: %{}
@@ -53,6 +53,11 @@ defmodule SSETestServer.SSEServer do
 
   def end_stream(sse, path),
     do: GenServer.call(sse, {:end_stream, path})
+
+  def configure_endpoint_handler(sse, path, handler_opts \\ []) do
+    :ok = configure_endpoint(sse, path, handler_opts)
+    {path, SSEHandler, %RequestHandler.State{sse_server: sse}}
+  end
 
   ## Internal client API
 
