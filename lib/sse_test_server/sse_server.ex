@@ -14,7 +14,7 @@ defmodule SSETestServer.SSEServer do
   """
   use GenServer
 
-  alias SSETestServer.RequestHandler
+  alias SSETestServer.{RequestHandler, SSEHandler}
 
   defmodule State do
     defstruct listener: nil, port: nil, sse_endpoints: %{}
@@ -25,7 +25,7 @@ defmodule SSETestServer.SSEServer do
     defstruct path: nil, stream_state: nil, streams: []
 
     defp stream_state(path, opts),
-      do: RequestHandler.StreamState.new(path, self(), opts)
+      do: SSEHandler.State.new(path, self(), opts)
 
     def configure(path, opts, nil),
       do: configure(path, opts, %__MODULE__{path: path})
@@ -132,7 +132,7 @@ defmodule SSETestServer.SSEServer do
     case Map.fetch(state.sse_endpoints, path) do
       :error -> {:reply, :path_not_found, state}
       {:ok, %{streams: streams}} ->
-        Enum.each(streams, &RequestHandler.send_info(&1, thing))
+        Enum.each(streams, &SSEHandler.send_info(&1, thing))
         {:reply, :ok, state}
     end
   end
