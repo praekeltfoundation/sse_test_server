@@ -39,7 +39,7 @@ defmodule SSETestServer.SSEServer do
   def start_link(args, opts \\ []),
     do: GenServer.start_link(__MODULE__, args, opts)
 
-  def configure_endpoint(sse, path, handler_opts \\ []),
+  def configure_endpoint(sse, path, handler_opts),
     do: GenServer.call(sse, {:configure_endpoint, path, handler_opts})
 
   def event(sse, path, event, data),
