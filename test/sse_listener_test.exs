@@ -9,9 +9,6 @@ defmodule SSETestServerTest.SSEListenerTest do
 
   def connect_and_collect(path), do: SSEClient.connect_and_collect(url(path))
 
-  def assert_control_err(body, code, {:error, resp}),
-    do: assert_response(resp, body, code, [])
-
   # This value is used for tests that measure responsese delays. The response
   # time (on my machine, at least) with no configured delay is consistently
   # under 100ms. I chose 250ms here as a balance between incorrect results and

@@ -34,6 +34,11 @@ defmodule SSETestServer.SSEHandler do
     end)
   end
 
+  # Reject non-GET methods with a 405.
+  def init(req, state) do
+    {:ok, :cowboy_req.reply(405, req), state}
+  end
+
   def handle_sse_stream(req, state, stream_state = %{opts: opts}) do
     :ok = SSEServer.sse_stream(state.sse_server, req.path, self())
     if opts.response_delay > 0, do: Process.sleep(opts.response_delay)

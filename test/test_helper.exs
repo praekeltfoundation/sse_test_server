@@ -23,6 +23,9 @@ defmodule SSEAssertions do
     body = events |> Stream.map(&event_data/1) |> Enum.join
     assert_response(resp, body, 200)
   end
+
+  def assert_control_err(body, code, {:error, resp}),
+    do: assert_response(resp, body, code, [])
 end
 
 defmodule SSEClient do

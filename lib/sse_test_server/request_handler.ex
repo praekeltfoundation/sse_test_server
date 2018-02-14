@@ -34,7 +34,7 @@ defmodule SSETestServer.RequestHandler do
 
   defmodule State do
     @enforce_keys [:sse_server]
-    defstruct sse_server: nil, path: nil
+    defstruct sse_server: nil
   end
 
   def init(req = %{method: "PUT"}, state), do: {PutHandler, req, state}
