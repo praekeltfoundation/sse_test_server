@@ -10,7 +10,7 @@ defmodule SSETestServer.Application do
   def start(_type, _args) do
     args = [port: get_config(:port)]
     children = [
-      {SSETestServer.SSEServer, args}
+      {SSETestServer.SSEListener, args}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
