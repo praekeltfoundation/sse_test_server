@@ -35,12 +35,7 @@ defmodule SSETestServer.Mixfile do
   defp deps do
     [
       {:conform, "~> 2.2"},
-      {:cowboy, "~> 2.1"},
-      # 2017-12-13: The latest hackney release (1.10.1) has a bug in async
-      # request cleanup: https://github.com/benoitc/hackney/issues/447 The
-      # partial fix in master leaves us with a silent deadlock, so for now
-      # we'll use an earlier version.
-      {:hackney, "~> 1.9.0", only: :test},
+      {:cowboy, "~> 2.2"},
       {:httpoison, "~> 0.13", only: :test},
       {:excoveralls, "~> 0.7", only: :test},
       {:distillery, "~> 1.5", runtime: :false},
