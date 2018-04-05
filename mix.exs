@@ -37,6 +37,9 @@ defmodule SSETestServer.Mixfile do
       {:conform, "~> 2.2"},
       {:cowboy, "~> 2.2"},
       {:httpoison, "~> 1.0", only: :test},
+      # Hackney is a dependency of HTTPoison but had a bug in versions 1.10.0 to
+      # 1.12.0 that caused deadlocks with async requests.
+      {:hackney, ">= 1.12.1", only: :test},
       {:excoveralls, "~> 0.7", only: :test},
       {:distillery, "~> 1.5", runtime: :false},
     ]
