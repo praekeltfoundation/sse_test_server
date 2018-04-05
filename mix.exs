@@ -36,7 +36,7 @@ defmodule SSETestServer.Mixfile do
     [
       {:conform, "~> 2.2"},
       {:cowboy, "~> 2.2"},
-      {:httpoison, "~> 0.13", only: :test},
+      {:httpoison, "~> 1.0", only: :test},
       {:excoveralls, "~> 0.7", only: :test},
       {:distillery, "~> 1.5", runtime: :false},
     ]
