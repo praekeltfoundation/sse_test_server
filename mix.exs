@@ -41,7 +41,7 @@ defmodule SSETestServer.Mixfile do
       # 1.12.0 that caused deadlocks with async requests.
       {:hackney, ">= 1.12.1", only: :test},
       {:excoveralls, "~> 0.7", only: :test},
-      {:distillery, "~> 1.5", runtime: :false},
+      {:distillery, "~> 1.5", runtime: :false, optional: true},
     ]
   end
 end
